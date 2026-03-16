@@ -109,6 +109,4 @@ Después ejecutar:
 - `app/exchange/rate_service.py`
 - `scripts/run_demo.py`
 
-## Nota importante
 
-Esta carpeta está lista para copiarse dentro de `bloque3-asfi/` en tu repo. El `.zip` que te entrego contiene la versión consolidada con tareas **1 a 17** integradas.
