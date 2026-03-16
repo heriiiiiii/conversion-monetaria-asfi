@@ -1,0 +1,184 @@
+version: '3.9'
+
+networks:
+  banking_network:
+    driver: bridge
+
+# =============================================================
+# SISTEMA BANCARIO DISTRIBUIDO
+# =============================================================
+# Motores:
+#   PostgreSQL  → FIE (RSA), PYME (ElGamal), Desarrollo (ECC)
+#   MySQL       → Unión (César), Mercantil (Atbash), BNB (Vigenère), BCP (Playfair)
+#   MariaDB     → BISA (Hill), Ganadero (DES), Económico (3DES), Prodem (Blowfish)
+#   MongoDB     → Solidario (Twofish), Fortaleza (AES)
+#   Redis       → Nación Argentina (ChaCha20)
+#   Central PG  → Base de datos central de consolidación
+# =============================================================
+
+services:
+
+  # ─────────────────────────────────────────
+  # POSTGRESQL — Bancos FIE, PYME, Desarrollo
+  # ─────────────────────────────────────────
+  banco_postgres:
+    image: postgres:15-alpine
+    container_name: banco_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./bancos/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_bancos_data:/var/lib/postgresql/data
+    networks:
+      - banking_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────
+  # MYSQL — Bancos Unión, Mercantil Santa Cruz, BNB, BCP
+  # ─────────────────────────────────────────────────────────
+  banco_mysql:
+    image: mysql:8.0
+    container_name: banco_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_USER: admin
+      MYSQL_PASSWORD: admin123
+    ports:
+      - "3307:3306"
+    volumes:
+      - ./bancos/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_bancos_data:/var/lib/mysql
+    networks:
+      - banking_network
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uadmin", "-padmin123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────
+  # MARIADB — Bancos BISA, Ganadero, Económico, Prodem
+  # ─────────────────────────────────────────────────────────
+  banco_mariadb:
+    image: mariadb:10.11
+    container_name: banco_mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root123
+      MARIADB_USER: admin
+      MARIADB_PASSWORD: admin123
+    ports:
+      - "3308:3306"
+    volumes:
+      - ./bancos/mariadb/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mariadb_bancos_data:/var/lib/mysql
+    networks:
+      - banking_network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────
+  # MONGODB — Bancos Solidario, Fortaleza
+  # ─────────────────────────────────────────────────────────
+  banco_mongodb:
+    image: mongo:7.0
+    container_name: banco_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin123
+    ports:
+      - "27017:27017"
+    volumes:
+      - ./bancos/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
+      - mongodb_bancos_data:/data/db
+    networks:
+      - banking_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────
+  # REDIS — Banco Nación Argentina
+  # ─────────────────────────────────────────────────────────
+  banco_redis:
+    image: redis:7.2-alpine
+    container_name: banco_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./bancos/redis/redis.conf:/usr/local/etc/redis/redis.conf
+      - redis_bancos_data:/data
+    networks:
+      - banking_network
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────────────────────
+  # POSTGRESQL CENTRAL — Base de datos de consolidación
+  # ─────────────────────────────────────────────────────────
+  central_postgres:
+    image: postgres:15-alpine
+    container_name: central_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: central_admin
+      POSTGRES_PASSWORD: central123
+      POSTGRES_DB: central_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./central/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - central_postgres_data:/var/lib/postgresql/data
+    networks:
+      - banking_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U central_admin -d central_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      banco_postgres:
+        condition: service_healthy
+      banco_mysql:
+        condition: service_healthy
+      banco_mariadb:
+        condition: service_healthy
+
+# ─────────────────────────────────────────────────────────
+# VOLÚMENES persistentes
+# ─────────────────────────────────────────────────────────
+volumes:
+  postgres_bancos_data:
+    driver: local
+  mysql_bancos_data:
+    driver: local
+  mariadb_bancos_data:
+    driver: local
+  mongodb_bancos_data:
+    driver: local
+  redis_bancos_data:
+    driver: local
+  central_postgres_data:
+    driver: local
