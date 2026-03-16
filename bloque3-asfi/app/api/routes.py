@@ -21,7 +21,12 @@ _pipeline: AsfiProcessingPipeline | None = None
 
 def _get_pipeline() -> AsfiProcessingPipeline:
     global _client, _pipeline
-    dataset = settings.project_root.parent / "01 - Practica 2 Dataset.csv"
+    candidates = [
+        settings.project_root.parent / '01 - Practica 2 Dataset.csv',
+        settings.project_root.parent / 'datasets' / '01 - Practica 2 Dataset.csv',
+        settings.project_root / 'data' / '01 - Practica 2 Dataset.csv',
+    ]
+    dataset = next((item for item in candidates if item.exists()), candidates[0])
     if _client is None:
         _client = MockBankClient(dataset_path=dataset, key_registry=_key_registry)
     if _pipeline is None:

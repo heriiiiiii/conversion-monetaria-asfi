@@ -40,6 +40,8 @@ class BankBatchResponse(BaseModel):
     timestamp: str
     nonce: str
     cuentas: List[BankAccountPayload]
+    api_key: Optional[str] = None
+    request_hash: Optional[str] = None
 
 
 class DecryptedAccountRecord(BaseModel):
@@ -63,6 +65,7 @@ class RateQuote(BaseModel):
     slot: int
     base_rate: Decimal
     drift: Decimal
+    source: str = "ASFI_BCB_INTERNAL"
 
 
 class ConversionRecord(BaseModel):
@@ -75,6 +78,7 @@ class ConversionRecord(BaseModel):
     codigo_verificacion: str
     tipo_cambio: Decimal
     modo_tipo_cambio: str
+    fuente_tipo_cambio: str = "ASFI_BCB_INTERNAL"
     lote_id: str
     identificacion: Optional[str] = None
     nro_cuenta: Optional[str] = None
@@ -88,12 +92,25 @@ class ProcessingError(BaseModel):
     lote_id: Optional[str] = None
 
 
+class AuditEvent(BaseModel):
+    timestamp: str
+    banco_id: int
+    cuenta_id: Optional[int]
+    evento: str
+    detalle: str
+    tipo_cambio: Optional[str] = None
+    modo_tipo_cambio: Optional[str] = None
+    fuente_tipo_cambio: Optional[str] = None
+    lote_id: Optional[str] = None
+
+
 class CallbackResult(BaseModel):
     banco_id: int
     cuenta_id: int
     accepted: bool
     saldo_bs: Decimal
     codigo_verificacion: str
+    updated_at: str
 
 
 class ConsistencyResult(BaseModel):

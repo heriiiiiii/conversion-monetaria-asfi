@@ -1,26 +1,40 @@
 # Bloque 3 - Servicio ASFI de Conversión Monetaria
 
-Implementación profesional en Python del **bloque 3** del proyecto `conversion-monetaria-asfi`.
+Implementación profesional en Python del **bloque 3** del proyecto `conversion-monetaria-asfi`, con cobertura integrada de las **tareas 1 a 17**.
 
-Incluye:
-- arquitectura modular y documentada
-- cliente para consumir APIs bancarias en paralelo
-- validación de request con timestamp y nonce
+## Qué incluye
+
+- arquitectura modular documentada
+- consumo de APIs bancarias con cliente real HTTP y mock de laboratorio
+- validación de request con **API key**, **timestamp**, **nonce** e **integridad por hash**
 - interpretación de `campos_cifrados`
 - registro central de llaves por banco
-- módulo de descifrado tolerante a errores
-- servicio dinámico de tipo de cambio
+- descifrado tolerante a errores
+- servicio dinámico de tipo de cambio desacoplado del flujo principal
 - conversión monetaria con precisión de 4 decimales
-- persistencia central ASFI en MySQL (scripts) y SQLite (demo local)
-- auditoría en archivo y tabla
-- devolución al banco y validación de consistencia
-- soporte de demo con dataset CSV
-- scripts SQL, Docker y material de defensa
+- persistencia central ASFI con esquema oficial `Bancos` + `Cuentas`
+- tablas de soporte para auditoría, callbacks, consistencia, llaves y errores
+- escritura **por lotes** sobre la base demo para evitar cuello de botella
+- devolución al banco vía API y validación de consistencia
+- Docker para MySQL y Neo4j
+- pruebas automatizadas, scripts de demo y material de defensa
+
+## Cobertura de tareas
+
+Resumen rápido:
+
+- **Tareas 1–10**: arquitectura, esquema central, catálogo de bancos, cliente bancario, `campos_cifrados`, llaves, descifrado, tipo de cambio, conversión y código de verificación.
+- **Tareas 11–17**: persistencia ASFI, auditoría, callback al banco, consistencia, barrido paralelo, mitigación de cuello de botella en base y seguridad básica.
+
+Mapa completo:
+- `docs/arquitectura-interna-asfi.md`
+- `docs/decisiones-tecnicas.md`
+- `docs/cobertura-tareas-1-17.md`
 
 ## Estructura
 
 ```text
-bloque3-asfi-entrega/
+bloque3-asfi/
 ├── app/
 ├── data/
 ├── docker/
@@ -46,13 +60,13 @@ python scripts/run_demo.py \
   --interval-seconds 3
 ```
 
-Esto:
+La demo:
 1. trunca tablas demo
-2. siembra catálogo de bancos
+2. siembra el catálogo de bancos y llaves
 3. procesa cuentas por banco en paralelo
-4. genera auditoría y log de tipo de cambio
-5. devuelve resultado a bancos mock
-6. valida consistencia
+4. registra auditoría y tipo de cambio
+5. devuelve resultado al banco mock
+6. valida consistencia entre callback y ASFI
 
 ### 2) Levantar API FastAPI
 
@@ -80,27 +94,21 @@ Después ejecutar:
 - `sql/04_consultas_entregable.sql`
 - `sql/05_neo4j_seed.cypher`
 
-## Decisiones de diseño
-
-- **Bloque 3 estaba vacío en el repo**, por eso esta entrega crea una base limpia y lista para integrarse.
-- Para demo local se usa **SQLite** porque no depende de drivers externos. La entrega incluye los **scripts MySQL** exigidos para producción y defensa.
-- El motor de tipo de cambio es **dinámico, configurable y desacoplado** del flujo de conversión.
-- La lógica de descifrado usa una **fábrica por algoritmo** y un **registro central de llaves** para evitar acoplamiento y desincronización.
-- Se incluye **cliente HTTP real** y **cliente mock**. Así puedes defender el diseño aunque bloque 2 no esté disponible.
-- Para algoritmos que no siempre tienen librería nativa disponible en todos los entornos académicos (por ejemplo `DES` y `Twofish`), el proyecto incluye un **modo de compatibilidad controlado** documentado en `docs/decisiones-tecnicas.md`.
-
 ## Archivos clave
 
 - `docs/arquitectura-interna-asfi.md`
+- `docs/cobertura-tareas-1-17.md`
 - `sql/01_create_asfi_mysql.sql`
 - `sql/02_seed_bancos.sql`
+- `sql/03_create_support_tables.sql`
 - `app/core/pipeline.py`
-- `app/crypto/decryptor.py`
+- `app/validators/request_validator.py`
+- `app/repository/sqlite_repository.py`
+- `app/clients/http_bank_client.py`
 - `app/clients/mock_bank_client.py`
 - `app/exchange/rate_service.py`
-- `app/repository/sqlite_repository.py`
 - `scripts/run_demo.py`
 
 ## Nota importante
 
-No puedo hacer push directo a tu GitHub desde aquí, pero la carpeta y el `.zip` salen listos para que los copies dentro de `bloque3-asfi/` en tu repo.
+Esta carpeta está lista para copiarse dentro de `bloque3-asfi/` en tu repo. El `.zip` que te entrego contiene la versión consolidada con tareas **1 a 17** integradas.
