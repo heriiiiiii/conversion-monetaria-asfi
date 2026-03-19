@@ -1,0 +1,24 @@
+# ============================================================
+# Bloque 1 — Dependencias Python
+# ============================================================
+# process_csv.py usa únicamente la biblioteca estándar de Python.
+# No se requiere instalar paquetes adicionales con pip.
+#
+# Python requerido: >= 3.8
+#
+# Módulos stdlib utilizados:
+#   - csv          (lectura del dataset)
+#   - os           (rutas de archivos)
+#   - base64       (cifrado académico simulado)
+#   - json         (exportación de estadísticas)
+#   - argparse     (argumentos de línea de comandos)
+#   - datetime     (timestamps en inserts)
+#
+# Herramientas externas requeridas:
+#   - Docker >= 24.x       (contenedores de bases de datos)
+#   - Docker Compose >= 2  (orquestación)
+#
+# Para ejecutar el procesador CSV en Windows:
+#   python scripts\process_csv.py
+# En Linux/Mac:
+#   python3 scripts/process_csv.py
