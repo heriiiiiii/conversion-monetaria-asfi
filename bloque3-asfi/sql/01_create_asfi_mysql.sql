@@ -8,12 +8,13 @@ CREATE TABLE IF NOT EXISTS Bancos (
 );
 
 CREATE TABLE IF NOT EXISTS Cuentas (
-    CuentaId BIGINT PRIMARY KEY,
+    CuentaId BIGINT NOT NULL,
     BancoId INT NOT NULL,
     SaldoUSD DECIMAL(18,4) NOT NULL,
     SaldoBs DECIMAL(18,4) NULL,
     FechaConversion DATETIME NULL,
     CodigoVerificacion CHAR(8) NULL,
+    PRIMARY KEY (CuentaId, BancoId),
     CONSTRAINT fk_cuentas_bancos
         FOREIGN KEY (BancoId) REFERENCES Bancos(BancoId)
 );

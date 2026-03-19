@@ -17,7 +17,7 @@ from app.clients.mock_bank_client import MockBankClient
 from app.core.pipeline import AsfiProcessingPipeline
 from app.crypto.key_registry import KeyRegistry
 from app.exchange.rate_service import DynamicRateService
-from app.repository.sqlite_repository import AsfiRepository
+from app.repository.factory import get_repository
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,7 +36,7 @@ async def main() -> None:
     if not dataset_path.exists():
         raise SystemExit(f"No se encontró el dataset: {dataset_path}")
 
-    repository = AsfiRepository()
+    repository = get_repository()
     repository.truncate_all()
     key_registry = KeyRegistry()
     repository.seed_banks(key_registry.export_mapping())
@@ -50,7 +50,10 @@ async def main() -> None:
         limit_per_bank=args.limit,
     )
     print(json.dumps(summary.model_dump(mode="json"), indent=2, ensure_ascii=False))
-    print(f"\nSQLite demo DB: {repository.db_path}")
+    if hasattr(repository, "db_path"):
+        print(f"\nSQLite demo DB: {repository.db_path}")
+    else:
+        print("\nMySQL demo DB: ASFI_Central")
     print("Audit log: logs/audit.log")
 
 

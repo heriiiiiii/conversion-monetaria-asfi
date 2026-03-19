@@ -41,13 +41,14 @@ class AsfiRepository:
                     UltimaSincronizacion TEXT NOT NULL,
                     FOREIGN KEY (BancoId) REFERENCES Bancos(BancoId)
                 );
-                CREATE TABLE IF NOT EXISTS Cuentas (
-                    CuentaId INTEGER PRIMARY KEY,
+                 CREATE TABLE IF NOT EXISTS Cuentas (
+                    CuentaId INTEGER NOT NULL,
                     BancoId INTEGER NOT NULL,
                     SaldoUSD TEXT NOT NULL,
                     SaldoBs TEXT,
                     FechaConversion TEXT,
                     CodigoVerificacion TEXT,
+                    PRIMARY KEY (CuentaId, BancoId),
                     FOREIGN KEY (BancoId) REFERENCES Bancos(BancoId)
                 );
                 CREATE TABLE IF NOT EXISTS AuditLog (
@@ -303,8 +304,23 @@ class AsfiRepository:
             )
             return [dict(row) for row in cur.fetchall()]
 
-    def fetch_account(self, cuenta_id: int) -> dict[str, Any] | None:
+    def fetch_account(self, cuenta_id: int, banco_id: int) -> dict[str, Any] | None:
         with self._lock:
-            cur = self.conn.execute("SELECT * FROM Cuentas WHERE CuentaId = ?", (cuenta_id,))
+            cur = self.conn.execute(
+                "SELECT * FROM Cuentas WHERE CuentaId = ? AND BancoId = ?",
+                (cuenta_id, banco_id),
+            )
             row = cur.fetchone()
             return dict(row) if row else None
+        
+    def close(self) -> None:
+        with self._lock:
+            if getattr(self, "conn", None) is not None:
+                self.conn.close()
+                self.conn = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()

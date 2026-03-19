@@ -204,7 +204,7 @@ class AsfiProcessingPipeline:
                         batch_audits.append(AuditEvent(timestamp=utcnow_iso(), banco_id=conversion.banco_id, cuenta_id=conversion.cuenta_id, evento="error", detalle=str(callback_result), lote_id=conversion.lote_id))
                         continue
                     batch_callbacks.append(callback_result)
-                    asfi_record = self.repository.fetch_account(conversion.cuenta_id)
+                    asfi_record = self.repository.fetch_account(conversion.cuenta_id, conversion.banco_id)
                     consistency = self.consistency_checker.validate(conversion, callback_result, asfi_record)
                     batch_consistency.append(consistency)
                     summary.successful_accounts += 1
