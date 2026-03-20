@@ -1,0 +1,140 @@
+services:
+  banco_api_1:
+    build: .
+    container_name: banco_api_1
+    env_file:
+      - .env.banco1
+    ports:
+      - "8001:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_2:
+    build: .
+    container_name: banco_api_2
+    env_file:
+      - .env.banco2
+    ports:
+      - "8002:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_3:
+    build: .
+    container_name: banco_api_3
+    env_file:
+      - .env.banco3
+    ports:
+      - "8003:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_4:
+    build: .
+    container_name: banco_api_4
+    env_file:
+      - .env.banco4
+    ports:
+      - "8004:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_5:
+    build: .
+    container_name: banco_api_5
+    env_file:
+      - .env.banco5
+    ports:
+      - "8005:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_6:
+    build: .
+    container_name: banco_api_6
+    env_file:
+      - .env.banco6
+    ports:
+      - "8006:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_7:
+    build: .
+    container_name: banco_api_7
+    env_file:
+      - .env.banco7
+    ports:
+      - "8007:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_8:
+    build: .
+    container_name: banco_api_8
+    env_file:
+      - .env.banco8
+    ports:
+      - "8008:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_9:
+    build: .
+    container_name: banco_api_9
+    env_file:
+      - .env.banco9
+    ports:
+      - "8009:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_10:
+    build: .
+    container_name: banco_api_10
+    env_file:
+      - .env.banco10
+    ports:
+      - "8010:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_11:
+    build: .
+    container_name: banco_api_11
+    env_file:
+      - .env.banco11
+    ports:
+      - "8011:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_12:
+    build: .
+    container_name: banco_api_12
+    env_file:
+      - .env.banco12
+    ports:
+      - "8012:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_13:
+    build: .
+    container_name: banco_api_13
+    env_file:
+      - .env.banco13
+    ports:
+      - "8013:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  banco_api_14:
+    build: .
+    container_name: banco_api_14
+    env_file:
+      - .env.banco14
+    ports:
+      - "8014:8001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

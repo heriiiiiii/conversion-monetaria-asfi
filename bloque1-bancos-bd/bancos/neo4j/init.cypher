@@ -289,5 +289,5 @@ CREATE (c5:Cliente {ci: '7500014', nombres: 'Camila Florencia', apellidos: 'Mart
 
 // ── Verificar carga ────────────────────────────────────────────────────────────
 MATCH (c:Cliente)-[:TIENE_CUENTA]->(ct:Cuenta)-[:PERTENECE_A]->(b:Banco)
-RETURN b.nombre AS Banco, count(ct) AS Cuentas
-ORDER BY b.id;
+RETURN b.id AS BancoId, b.nombre AS Banco, count(ct) AS Cuentas
+ORDER BY BancoId;
