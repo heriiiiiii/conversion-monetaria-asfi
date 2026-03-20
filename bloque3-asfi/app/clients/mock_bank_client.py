@@ -13,7 +13,7 @@ from app.constants import BANK_BY_ID
 from app.core.schemas import BankAccountPayload, BankBatchResponse, CallbackResult
 from app.crypto.algorithms import encrypt_text
 from app.crypto.key_registry import KeyRegistry
-from app.utils.security import generate_nonce
+from app.utils.security import compute_batch_hash, derive_bank_api_key, generate_nonce
 from app.utils.time_utils import utcnow_iso
 
 
@@ -37,6 +37,8 @@ class MockBankClient(AbstractBankClient):
             chunk = subset.iloc[batch_index * batch_size : (batch_index + 1) * batch_size]
             records = []
             lote_id = f"BANK-{bank_id}-BATCH-{batch_index + 1}"
+            batch_nonce = generate_nonce()
+            batch_timestamp = utcnow_iso()
             for row in chunk.itertuples(index=False):
                 campos_cifrados = []
                 saldo_plain = f"{row.Saldo:.4f}"
@@ -61,8 +63,8 @@ class MockBankClient(AbstractBankClient):
                     nro_cuenta=str(row.NroCuenta),
                     saldo_usd=saldo_payload,
                     campos_cifrados=campos_cifrados,
-                    timestamp=utcnow_iso(),
-                    nonce=generate_nonce(),
+                    timestamp=batch_timestamp,
+                    nonce=batch_nonce,
                     lote_id=lote_id,
                 )
                 records.append(record)
@@ -71,9 +73,11 @@ class MockBankClient(AbstractBankClient):
                 banco_nombre=bank["name"],
                 algoritmo=bank["algorithm"],
                 lote_id=lote_id,
-                timestamp=utcnow_iso(),
-                nonce=generate_nonce(),
+                timestamp=batch_timestamp,
+                nonce=batch_nonce,
                 cuentas=records,
+                api_key=derive_bank_api_key(bank_id),
+                request_hash=compute_batch_hash(bank_id, lote_id, batch_timestamp, batch_nonce, records),
             )
 
     async def send_callback(self, callback: CallbackResult) -> CallbackResult:

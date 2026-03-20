@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import secrets
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
+from typing import Iterable
+
+from app.core.schemas import BankAccountPayload
 
 
 class NonceStore:
@@ -32,3 +37,40 @@ def generate_nonce(size: int = 16) -> str:
 
 def generate_verification_code() -> str:
     return secrets.token_hex(4).upper()
+
+
+def derive_bank_api_key(bank_id: int) -> str:
+    return hashlib.sha256(f"ASFI|BANK|{bank_id}|APIKEY".encode("utf-8")).hexdigest()[:32].upper()
+
+
+_ALLOWED_BATCH_FIELDS = (
+    "banco_id",
+    "banco_nombre",
+    "algoritmo",
+    "cuenta_id",
+    "identificacion",
+    "nombres",
+    "apellidos",
+    "nro_cuenta",
+    "saldo_usd",
+    "campos_cifrados",
+    "timestamp",
+    "nonce",
+    "lote_id",
+)
+
+
+def compute_batch_hash(bank_id: int, lote_id: str, timestamp: str, nonce: str, cuentas: Iterable[BankAccountPayload]) -> str:
+    normalized = []
+    for account in cuentas:
+        payload = account.model_dump(mode="json", include=set(_ALLOWED_BATCH_FIELDS))
+        normalized.append(payload)
+    body = {
+        "bank_id": bank_id,
+        "lote_id": lote_id,
+        "timestamp": timestamp,
+        "nonce": nonce,
+        "cuentas": sorted(normalized, key=lambda item: item["cuenta_id"]),
+    }
+    raw = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()

@@ -14,6 +14,7 @@ class DynamicRateService:
     interval_seconds: int = settings.rate_interval_seconds
     official_base: Decimal = settings.official_base
     referential_base: Decimal = settings.referential_base
+    source: str = "ASFI_BCB_INTERNAL"
 
     def current_rate(self, mode: str = "OFICIAL") -> RateQuote:
         mode = mode.upper()
@@ -34,4 +35,5 @@ class DynamicRateService:
             slot=slot,
             base_rate=base_rate,
             drift=drift,
+            source=self.source,
         )

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS AuditLog (
     Detalle TEXT NULL,
     TipoCambio DECIMAL(18,4) NULL,
     ModoTipoCambio VARCHAR(20) NULL,
+    FuenteTipoCambio VARCHAR(50) NULL,
     LoteId VARCHAR(100) NULL,
     INDEX idx_audit_banco_cuenta (BancoId, CuentaId),
     INDEX idx_audit_timestamp (Timestamp),
@@ -32,6 +33,7 @@ CREATE TABLE IF NOT EXISTS TipoCambioLog (
     BaseRate DECIMAL(18,4) NOT NULL,
     Drift DECIMAL(18,4) NOT NULL,
     Slot BIGINT NOT NULL,
+    Source VARCHAR(50) NOT NULL,
     INDEX idx_rate_mode_time (Modo, Timestamp)
 );
 
@@ -55,6 +57,7 @@ CREATE TABLE IF NOT EXISTS BancoCallbacks (
     SaldoBs DECIMAL(18,4) NOT NULL,
     CodigoVerificacion CHAR(8) NOT NULL,
     Accepted BOOLEAN NOT NULL,
+    UpdatedAt DATETIME NOT NULL,
     INDEX idx_callback_banco_cuenta (BancoId, CuentaId),
     FOREIGN KEY (BancoId) REFERENCES Bancos(BancoId)
 );

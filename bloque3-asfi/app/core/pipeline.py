@@ -9,7 +9,7 @@ from app.clients.bank_client import AbstractBankClient
 from app.constants import BANK_BY_ID, BANK_CATALOG
 from app.consistency.checker import ConsistencyChecker
 from app.converter.currency import convert_usd_to_bs
-from app.core.schemas import BankProcessingSummary, ConversionRecord, DecryptedAccountRecord, ProcessingError, RunSummary
+from app.core.schemas import AuditEvent, BankProcessingSummary, ConversionRecord, DecryptedAccountRecord, ProcessingError, RunSummary
 from app.crypto.decryptor import DecryptorService
 from app.crypto.encrypted_fields import EncryptedFieldsInterpreter
 from app.exchange.rate_service import DynamicRateService
@@ -70,17 +70,35 @@ class AsfiProcessingPipeline:
             started_at=utcnow_iso(),
         )
         async for batch in self.client.fetch_bank_batches(bank_id=bank_id, batch_size=batch_size, limit=limit):
+            batch_audits: list[AuditEvent] = []
+            batch_conversions: list[ConversionRecord] = []
+            batch_callbacks = []
+            batch_consistency = []
+            batch_errors: list[ProcessingError] = []
             try:
                 self.validator.validate_batch(batch)
                 quote = self.rate_service.current_rate(rate_mode)
                 self.repository.log_rate(quote)
-                self.repository.log_audit(quote.generated_at, bank_id, None, "rate_quote", f"Tipo de cambio {quote.rate}", str(quote.rate), quote.mode, batch.lote_id)
+                batch_audits.append(
+                    AuditEvent(
+                        timestamp=quote.generated_at,
+                        banco_id=bank_id,
+                        cuenta_id=None,
+                        evento="rate_quote",
+                        detalle=f"Tipo de cambio {quote.rate}",
+                        tipo_cambio=str(quote.rate),
+                        modo_tipo_cambio=quote.mode,
+                        fuente_tipo_cambio=quote.source,
+                        lote_id=batch.lote_id,
+                    )
+                )
                 self.audit_logger.write({
                     "timestamp": quote.generated_at,
                     "bank_id": bank_id,
                     "event": "rate_quote",
                     "exchange_rate": str(quote.rate),
                     "mode": quote.mode,
+                    "source": quote.source,
                     "slot": quote.slot,
                     "batch_id": batch.lote_id,
                 })
@@ -90,6 +108,7 @@ class AsfiProcessingPipeline:
                 summary.errors.append(err)
                 summary.failed_accounts += len(batch.cuentas)
                 self.repository.log_error(err)
+                self.repository.log_audit(utcnow_iso(), bank_id, None, "error", str(exc), lote_id=batch.lote_id)
                 continue
 
             for account in batch.cuentas:
@@ -121,12 +140,25 @@ class AsfiProcessingPipeline:
                         codigo_verificacion=generate_verification_code(),
                         tipo_cambio=quote.rate,
                         modo_tipo_cambio=quote.mode,
+                        fuente_tipo_cambio=quote.source,
                         lote_id=batch.lote_id,
                         identificacion=record.identificacion,
                         nro_cuenta=record.nro_cuenta,
                     )
-                    self.repository.save_conversion(conversion)
-                    self.repository.log_audit(conversion.fecha_conversion, bank_id, record.cuenta_id, "conversion", f"Conversión {record.saldo_usd} USD -> {saldo_bs} Bs.", str(quote.rate), quote.mode, batch.lote_id)
+                    batch_conversions.append(conversion)
+                    batch_audits.append(
+                        AuditEvent(
+                            timestamp=conversion.fecha_conversion,
+                            banco_id=bank_id,
+                            cuenta_id=record.cuenta_id,
+                            evento="conversion",
+                            detalle=f"Conversión {record.saldo_usd} USD -> {saldo_bs} Bs.",
+                            tipo_cambio=str(quote.rate),
+                            modo_tipo_cambio=quote.mode,
+                            fuente_tipo_cambio=quote.source,
+                            lote_id=batch.lote_id,
+                        )
+                    )
                     self.audit_logger.write({
                         "timestamp": conversion.fecha_conversion,
                         "bank_id": bank_id,
@@ -136,14 +168,10 @@ class AsfiProcessingPipeline:
                         "amount_bs": str(saldo_bs),
                         "exchange_rate": str(quote.rate),
                         "mode": quote.mode,
+                        "source": quote.source,
                         "verification_code": conversion.codigo_verificacion,
                         "batch_id": batch.lote_id,
                     })
-                    callback = await self.callback_service.send_result(conversion)
-                    self.repository.save_callback(callback)
-                    consistency = self.consistency_checker.validate(conversion, callback)
-                    self.repository.save_consistency(consistency)
-                    summary.successful_accounts += 1
                 except Exception as exc:
                     err = ProcessingError(
                         banco_id=bank_id,
@@ -154,7 +182,40 @@ class AsfiProcessingPipeline:
                     )
                     summary.failed_accounts += 1
                     summary.errors.append(err)
-                    self.repository.log_error(err)
-                    self.repository.log_audit(utcnow_iso(), bank_id, account.cuenta_id, "error", str(exc), lote_id=batch.lote_id)
+                    batch_errors.append(err)
+                    batch_audits.append(AuditEvent(timestamp=utcnow_iso(), banco_id=bank_id, cuenta_id=account.cuenta_id, evento="error", detalle=str(exc), lote_id=batch.lote_id))
+
+            if batch_conversions:
+                self.repository.save_conversions_batch(batch_conversions)
+                callbacks = await asyncio.gather(*(self.callback_service.send_result(item) for item in batch_conversions), return_exceptions=True)
+                for conversion, callback_result in zip(batch_conversions, callbacks, strict=True):
+                    if isinstance(callback_result, Exception):
+                        err = ProcessingError(
+                            banco_id=conversion.banco_id,
+                            cuenta_id=conversion.cuenta_id,
+                            stage="callback_banco",
+                            error=str(callback_result),
+                            lote_id=conversion.lote_id,
+                        )
+                        batch_errors.append(err)
+                        summary.failed_accounts += 1
+                        summary.successful_accounts = max(0, summary.successful_accounts - 1)
+                        summary.errors.append(err)
+                        batch_audits.append(AuditEvent(timestamp=utcnow_iso(), banco_id=conversion.banco_id, cuenta_id=conversion.cuenta_id, evento="error", detalle=str(callback_result), lote_id=conversion.lote_id))
+                        continue
+                    batch_callbacks.append(callback_result)
+                    asfi_record = self.repository.fetch_account(conversion.cuenta_id, conversion.banco_id)
+                    consistency = self.consistency_checker.validate(conversion, callback_result, asfi_record)
+                    batch_consistency.append(consistency)
+                    summary.successful_accounts += 1
+
+                self.repository.save_callbacks_batch(batch_callbacks)
+                self.repository.save_consistency_batch(batch_consistency)
+
+            if batch_audits:
+                self.repository.log_audit_batch(batch_audits)
+            if batch_errors:
+                self.repository.log_errors_batch(batch_errors)
+
         summary.finished_at = utcnow_iso()
         return summary

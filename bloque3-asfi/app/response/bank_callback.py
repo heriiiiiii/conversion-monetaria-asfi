@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.clients.bank_client import AbstractBankClient
 from app.core.schemas import CallbackResult, ConversionRecord
+from app.utils.time_utils import utcnow_iso
 
 
 class BankCallbackService:
@@ -15,5 +16,6 @@ class BankCallbackService:
             accepted=True,
             saldo_bs=record.saldo_bs,
             codigo_verificacion=record.codigo_verificacion,
+            updated_at=utcnow_iso(),
         )
         return await self.client.send_callback(callback)
