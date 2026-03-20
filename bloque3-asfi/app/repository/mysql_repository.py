@@ -76,7 +76,7 @@ class AsfiRepository:
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS Cuentas (
-                    CuentaId BIGINT NOT NULL,
+                    CuentaId VARCHAR(255) NOT NULL,
                     BancoId INT NOT NULL,
                     SaldoUSD DECIMAL(18,4) NOT NULL,
                     SaldoBs DECIMAL(18,4) NULL,
@@ -94,7 +94,7 @@ class AsfiRepository:
                     AuditId BIGINT AUTO_INCREMENT PRIMARY KEY,
                     Timestamp DATETIME NOT NULL,
                     BancoId INT NOT NULL,
-                    CuentaId BIGINT NULL,
+                    CuentaId VARCHAR(255) NULL,
                     Evento VARCHAR(50) NOT NULL,
                     Detalle TEXT NULL,
                     TipoCambio DECIMAL(18,4) NULL,
@@ -128,7 +128,7 @@ class AsfiRepository:
                     ErrorId BIGINT AUTO_INCREMENT PRIMARY KEY,
                     Timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     BancoId INT NOT NULL,
-                    CuentaId BIGINT NULL,
+                    CuentaId VARCHAR(255) NULL,
                     Etapa VARCHAR(50) NOT NULL,
                     Error TEXT NOT NULL,
                     LoteId VARCHAR(100) NULL,
@@ -143,7 +143,7 @@ class AsfiRepository:
                     CallbackId BIGINT AUTO_INCREMENT PRIMARY KEY,
                     Timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     BancoId INT NOT NULL,
-                    CuentaId BIGINT NOT NULL,
+                    CuentaId VARCHAR(255) NOT NULL,
                     SaldoBs DECIMAL(18,4) NOT NULL,
                     CodigoVerificacion CHAR(8) NOT NULL,
                     Accepted BOOLEAN NOT NULL,
@@ -159,7 +159,7 @@ class AsfiRepository:
                     CheckId BIGINT AUTO_INCREMENT PRIMARY KEY,
                     Timestamp DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     BancoId INT NOT NULL,
-                    CuentaId BIGINT NOT NULL,
+                    CuentaId VARCHAR(255) NOT NULL,
                     IsConsistent BOOLEAN NOT NULL,
                     Details TEXT NOT NULL,
                     INDEX idx_consistency_banco_cuenta (BancoId, CuentaId),
@@ -265,7 +265,7 @@ class AsfiRepository:
         self,
         timestamp: str,
         banco_id: int,
-        cuenta_id: int | None,
+        cuenta_id: str | None,
         evento: str,
         detalle: str,
         tipo_cambio: str | None = None,
@@ -443,7 +443,7 @@ class AsfiRepository:
             cursor.close()
             return [dict(row) for row in rows]
 
-    def fetch_account(self, cuenta_id: int, banco_id: int) -> dict[str, Any] | None:
+    def fetch_account(self, cuenta_id: str, banco_id: int) -> dict[str, Any] | None:
         with self._lock:
             cursor = self.conn.cursor(dictionary=True)
             cursor.execute(

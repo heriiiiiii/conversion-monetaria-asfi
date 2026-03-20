@@ -24,39 +24,54 @@ class MockBankClient(AbstractBankClient):
         self.df = pd.read_csv(self.dataset_path)
         self.callbacks: list[dict] = []
 
-    async def fetch_bank_batches(self, bank_id: int, batch_size: int = 500, limit: int | None = None) -> AsyncIterator[BankBatchResponse]:
+    async def fetch_bank_batches(
+        self,
+        bank_id: int,
+        batch_size: int = 500,
+        limit: int | None = None,
+    ) -> AsyncIterator[BankBatchResponse]:
         await asyncio.sleep(0)
+
         bank = BANK_BY_ID[bank_id]
         material = self.key_registry.get(bank_id)
         subset = self.df[self.df["IdBanco"] == bank_id].copy()
+
         if limit:
             subset = subset.head(limit)
+
         total = len(subset)
         total_batches = max(1, math.ceil(total / batch_size))
+
         for batch_index in range(total_batches):
             chunk = subset.iloc[batch_index * batch_size : (batch_index + 1) * batch_size]
             records = []
+
             lote_id = f"BANK-{bank_id}-BATCH-{batch_index + 1}"
             batch_nonce = generate_nonce()
             batch_timestamp = utcnow_iso()
+
             for row in chunk.itertuples(index=False):
-                campos_cifrados = []
-                saldo_plain = f"{row.Saldo:.4f}"
+                campos_cifrados: list[str] = []
+
+                saldo_plain = f"{float(row.Saldo):.4f}"
                 saldo_payload = encrypt_text(bank["algorithm"], saldo_plain, material)
-                campos_cifrados.append("saldo_usd")
+                campos_cifrados.append("SaldoUSD")
 
                 ident_plain = str(row.Identificacion)
                 if float(row.Saldo) >= float(settings.encrypt_large_amount_threshold):
                     ident_payload = encrypt_text(bank["algorithm"], ident_plain, material)
-                    campos_cifrados.append("identificacion")
+                    campos_cifrados.append("CI")
                 else:
                     ident_payload = ident_plain
+
+                # CuentaId lógico mock: usamos Nro como id de registro y NroCuenta como número de cuenta real
+                cuenta_id = str(row.Nro)
 
                 record = BankAccountPayload(
                     banco_id=bank_id,
                     banco_nombre=bank["name"],
                     algoritmo=bank["algorithm"],
-                    cuenta_id=int(row.NroCuenta),
+                    cuenta_id=cuenta_id,
                     identificacion=ident_payload,
                     nombres=str(row.Nombres),
                     apellidos=str(row.Apellidos),
@@ -68,6 +83,7 @@ class MockBankClient(AbstractBankClient):
                     lote_id=lote_id,
                 )
                 records.append(record)
+
             yield BankBatchResponse(
                 banco_id=bank_id,
                 banco_nombre=bank["name"],
@@ -77,7 +93,13 @@ class MockBankClient(AbstractBankClient):
                 nonce=batch_nonce,
                 cuentas=records,
                 api_key=derive_bank_api_key(bank_id),
-                request_hash=compute_batch_hash(bank_id, lote_id, batch_timestamp, batch_nonce, records),
+                request_hash=compute_batch_hash(
+                    bank_id,
+                    lote_id,
+                    batch_timestamp,
+                    batch_nonce,
+                    records,
+                ),
             )
 
     async def send_callback(self, callback: CallbackResult) -> CallbackResult:

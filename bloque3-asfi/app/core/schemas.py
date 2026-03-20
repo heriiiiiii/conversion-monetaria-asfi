@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Any, Dict, List, Literal, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
+
+
+def _normalize_account_id(value: Any) -> str:
+    if value is None:
+        raise ValueError("cuenta_id no puede ser nulo")
+    return str(value)
+
+
+AccountId = Annotated[str, BeforeValidator(_normalize_account_id)]
 
 
 class EncryptedEnvelope(BaseModel):
@@ -20,7 +29,7 @@ class BankAccountPayload(BaseModel):
     banco_id: int
     banco_nombre: str
     algoritmo: str
-    cuenta_id: int
+    cuenta_id: AccountId
     identificacion: Any
     nombres: str
     apellidos: str
@@ -48,7 +57,7 @@ class DecryptedAccountRecord(BaseModel):
     banco_id: int
     banco_nombre: str
     algoritmo: str
-    cuenta_id: int
+    cuenta_id: AccountId
     identificacion: Any
     nombres: str
     apellidos: str
@@ -69,7 +78,7 @@ class RateQuote(BaseModel):
 
 
 class ConversionRecord(BaseModel):
-    cuenta_id: int
+    cuenta_id: AccountId
     banco_id: int
     banco_nombre: str
     saldo_usd: Decimal
@@ -86,7 +95,7 @@ class ConversionRecord(BaseModel):
 
 class ProcessingError(BaseModel):
     banco_id: int
-    cuenta_id: Optional[int]
+    cuenta_id: Optional[AccountId]
     stage: str
     error: str
     lote_id: Optional[str] = None
@@ -95,7 +104,7 @@ class ProcessingError(BaseModel):
 class AuditEvent(BaseModel):
     timestamp: str
     banco_id: int
-    cuenta_id: Optional[int]
+    cuenta_id: Optional[AccountId]
     evento: str
     detalle: str
     tipo_cambio: Optional[str] = None
@@ -106,7 +115,7 @@ class AuditEvent(BaseModel):
 
 class CallbackResult(BaseModel):
     banco_id: int
-    cuenta_id: int
+    cuenta_id: AccountId
     accepted: bool
     saldo_bs: Decimal
     codigo_verificacion: str
@@ -115,7 +124,7 @@ class CallbackResult(BaseModel):
 
 class ConsistencyResult(BaseModel):
     banco_id: int
-    cuenta_id: int
+    cuenta_id: AccountId
     is_consistent: bool
     details: str
 

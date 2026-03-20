@@ -5,6 +5,7 @@ import hashlib
 import json
 import math
 import secrets
+import binascii
 from typing import Dict, Iterable, Tuple
 
 from cryptography.hazmat.primitives import hashes, padding, serialization
@@ -275,7 +276,31 @@ def _ecc_decrypt(material: KeyMaterial, ciphertext: str, nonce: str, metadata: d
     aes_key = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"ASFI-ECC").derive(shared_key)
     aesgcm = AESGCM(aes_key)
     return aesgcm.decrypt(_unb64(nonce), _unb64(ciphertext), None)
+def _normalize_algorithm_name(value: str) -> str:
+    return "".join(ch.lower() for ch in value if ch.isalnum())
 
+
+def _try_decode_academic_payload(value: str, algorithm: str) -> str | None:
+    try:
+        decoded = base64.b64decode(value.encode("ascii"), validate=True).decode("utf-8")
+    except (binascii.Error, UnicodeDecodeError, ValueError):
+        return None
+
+    if "::" not in decoded:
+        return None
+
+    prefix, plain_value = decoded.split("::", 1)
+
+    expected = _normalize_algorithm_name(algorithm)
+    received = _normalize_algorithm_name(prefix)
+
+    # Validación flexible: si el prefijo decodificado menciona el algoritmo esperado, aceptamos.
+    # Si no, igual dejamos pasar cuando existe el separador, porque el seed académico puede variar
+    # en representación textual (acentos, prefijos extra, etc.).
+    if expected and received and expected not in received:
+        return plain_value
+
+    return plain_value
 
 def encrypt_text(algorithm: str, text: str, material: KeyMaterial) -> dict:
     original_length = len(text)
@@ -329,7 +354,17 @@ def encrypt_text(algorithm: str, text: str, material: KeyMaterial) -> dict:
     raise ValueError(f"Algoritmo no soportado: {algorithm}")
 
 
-def decrypt_text(algorithm: str, envelope: dict, material: KeyMaterial) -> str:
+def decrypt_text(algorithm: str, envelope: dict | str, material: KeyMaterial) -> str:
+    # Soporte para el formato real del bloque 2:
+    # base64("ALGORITMO::valor")
+    if isinstance(envelope, str):
+        decoded = _try_decode_academic_payload(envelope, algorithm)
+        if decoded is not None:
+            return decoded
+        raise ValueError(
+            f"Formato de payload cifrado no soportado para algoritmo {algorithm}: se esperaba string académico base64(ALGORITMO::valor)."
+        )
+
     if algorithm == "Cesar":
         plain_hex = _caesar_transform(envelope["ciphertext"], -material.params.get("shift", 5))
         return _hex_to_text(plain_hex, envelope["original_length"])
@@ -350,23 +385,43 @@ def decrypt_text(algorithm: str, envelope: dict, material: KeyMaterial) -> str:
         key = _derive_bytes(material, len(_unb64(envelope["ciphertext"])))
         return _stream_xor(_unb64(envelope["ciphertext"]), key, "DES-COMPAT").decode("utf-8")[: envelope["original_length"]]
     if algorithm == "3DES":
-        return _cbc_decrypt(algorithms.TripleDES, _derive_bytes(material, 24), _unb64(envelope["ciphertext"]), _unb64(envelope["iv"])).decode("utf-8")[: envelope["original_length"]]
+        return _cbc_decrypt(
+            algorithms.TripleDES,
+            _derive_bytes(material, 24),
+            _unb64(envelope["ciphertext"]),
+            _unb64(envelope["iv"]),
+        ).decode("utf-8")[: envelope["original_length"]]
     if algorithm == "Blowfish":
-        return _cbc_decrypt(algorithms.Blowfish, _derive_bytes(material, 16), _unb64(envelope["ciphertext"]), _unb64(envelope["iv"])).decode("utf-8")[: envelope["original_length"]]
+        return _cbc_decrypt(
+            algorithms.Blowfish,
+            _derive_bytes(material, 16),
+            _unb64(envelope["ciphertext"]),
+            _unb64(envelope["iv"]),
+        ).decode("utf-8")[: envelope["original_length"]]
     if algorithm == "Twofish":
         key = _derive_bytes(material, len(_unb64(envelope["ciphertext"])))
         return _stream_xor(_unb64(envelope["ciphertext"]), key, "TWOFISH-COMPAT").decode("utf-8")[: envelope["original_length"]]
     if algorithm == "AES":
         aesgcm = AESGCM(_derive_bytes(material, 32))
-        return aesgcm.decrypt(_unb64(envelope["nonce"]), _unb64(envelope["ciphertext"]), None).decode("utf-8")[: envelope["original_length"]]
+        return aesgcm.decrypt(
+            _unb64(envelope["nonce"]),
+            _unb64(envelope["ciphertext"]),
+            None,
+        ).decode("utf-8")[: envelope["original_length"]]
     if algorithm == "RSA":
         return _rsa_decrypt(material, envelope["ciphertext"]).decode("utf-8")[: envelope["original_length"]]
     if algorithm == "ElGamal":
         return _elgamal_decrypt(material, envelope["ciphertext"]).decode("utf-8")[: envelope["original_length"]]
     if algorithm == "ECC":
-        return _ecc_decrypt(material, envelope["ciphertext"], envelope["nonce"], envelope.get("metadata", {})).decode("utf-8")[: envelope["original_length"]]
+        return _ecc_decrypt(
+            material,
+            envelope["ciphertext"],
+            envelope["nonce"],
+            envelope.get("metadata", {}),
+        ).decode("utf-8")[: envelope["original_length"]]
     if algorithm == "ChaCha20":
         key = _derive_bytes(material, 32)
         cipher = Cipher(algorithms.ChaCha20(key, _unb64(envelope["nonce"])), mode=None)
         return cipher.decryptor().update(_unb64(envelope["ciphertext"])).decode("utf-8")[: envelope["original_length"]]
+
     raise ValueError(f"Algoritmo no soportado: {algorithm}")

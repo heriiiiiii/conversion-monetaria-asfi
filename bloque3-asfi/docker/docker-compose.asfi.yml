@@ -18,8 +18,8 @@ services:
     environment:
       NEO4J_AUTH: neo4j/password123
     ports:
-      - "7474:7474"
-      - "7687:7687"
+      - "7574:7574"
+      - "7787:7787"
     volumes:
       - neo4j_asfi_data:/data
 

@@ -6,7 +6,14 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from app.config import settings
-from app.core.schemas import AuditEvent, CallbackResult, ConsistencyResult, ConversionRecord, ProcessingError, RateQuote
+from app.core.schemas import (
+    AuditEvent,
+    CallbackResult,
+    ConsistencyResult,
+    ConversionRecord,
+    ProcessingError,
+    RateQuote,
+)
 
 
 class AsfiRepository:
@@ -33,6 +40,7 @@ class AsfiRepository:
                     Nombre TEXT NOT NULL,
                     AlgoritmoEncriptacion TEXT NOT NULL
                 );
+
                 CREATE TABLE IF NOT EXISTS BancoLlaves (
                     BancoId INTEGER PRIMARY KEY,
                     Algoritmo TEXT NOT NULL,
@@ -41,8 +49,9 @@ class AsfiRepository:
                     UltimaSincronizacion TEXT NOT NULL,
                     FOREIGN KEY (BancoId) REFERENCES Bancos(BancoId)
                 );
-                 CREATE TABLE IF NOT EXISTS Cuentas (
-                    CuentaId INTEGER NOT NULL,
+
+                CREATE TABLE IF NOT EXISTS Cuentas (
+                    CuentaId TEXT NOT NULL,
                     BancoId INTEGER NOT NULL,
                     SaldoUSD TEXT NOT NULL,
                     SaldoBs TEXT,
@@ -51,11 +60,12 @@ class AsfiRepository:
                     PRIMARY KEY (CuentaId, BancoId),
                     FOREIGN KEY (BancoId) REFERENCES Bancos(BancoId)
                 );
+
                 CREATE TABLE IF NOT EXISTS AuditLog (
                     AuditId INTEGER PRIMARY KEY AUTOINCREMENT,
                     Timestamp TEXT NOT NULL,
                     BancoId INTEGER NOT NULL,
-                    CuentaId INTEGER,
+                    CuentaId TEXT,
                     Evento TEXT NOT NULL,
                     Detalle TEXT,
                     TipoCambio TEXT,
@@ -63,6 +73,7 @@ class AsfiRepository:
                     FuenteTipoCambio TEXT,
                     LoteId TEXT
                 );
+
                 CREATE TABLE IF NOT EXISTS TipoCambioLog (
                     RateLogId INTEGER PRIMARY KEY AUTOINCREMENT,
                     Timestamp TEXT NOT NULL,
@@ -73,30 +84,33 @@ class AsfiRepository:
                     Slot INTEGER NOT NULL,
                     Source TEXT NOT NULL
                 );
+
                 CREATE TABLE IF NOT EXISTS ProcesamientoErrores (
                     ErrorId INTEGER PRIMARY KEY AUTOINCREMENT,
                     Timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     BancoId INTEGER NOT NULL,
-                    CuentaId INTEGER,
+                    CuentaId TEXT,
                     Etapa TEXT NOT NULL,
                     Error TEXT NOT NULL,
                     LoteId TEXT
                 );
+
                 CREATE TABLE IF NOT EXISTS BancoCallbacks (
                     CallbackId INTEGER PRIMARY KEY AUTOINCREMENT,
                     Timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     BancoId INTEGER NOT NULL,
-                    CuentaId INTEGER NOT NULL,
+                    CuentaId TEXT NOT NULL,
                     SaldoBs TEXT NOT NULL,
                     CodigoVerificacion TEXT NOT NULL,
                     Accepted INTEGER NOT NULL,
                     UpdatedAt TEXT NOT NULL
                 );
+
                 CREATE TABLE IF NOT EXISTS ConsistencyChecks (
                     CheckId INTEGER PRIMARY KEY AUTOINCREMENT,
                     Timestamp TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     BancoId INTEGER NOT NULL,
-                    CuentaId INTEGER NOT NULL,
+                    CuentaId TEXT NOT NULL,
                     IsConsistent INTEGER NOT NULL,
                     Details TEXT NOT NULL
                 );
@@ -104,7 +118,6 @@ class AsfiRepository:
             )
             self._run_migrations()
             self.conn.commit()
-
 
     def _run_migrations(self) -> None:
         self._ensure_column("AuditLog", "FuenteTipoCambio", "TEXT")
@@ -136,6 +149,7 @@ class AsfiRepository:
     def seed_banks(self, bank_mapping: list[dict[str, Any]]) -> None:
         bancos_rows = [(b["bank_id"], b["name"], b["algorithm"]) for b in bank_mapping]
         key_rows = [(m["bank_id"], m["algorithm"], m["seed"], m["key_type"]) for m in bank_mapping]
+
         with self._lock:
             self.conn.executemany(
                 "INSERT OR REPLACE INTO Bancos (BancoId, Nombre, AlgoritmoEncriptacion) VALUES (?, ?, ?)",
@@ -157,6 +171,7 @@ class AsfiRepository:
     def save_conversions_batch(self, records: Sequence[ConversionRecord]) -> None:
         if not records:
             return
+
         rows = [
             (
                 record.cuenta_id,
@@ -168,6 +183,7 @@ class AsfiRepository:
             )
             for record in records
         ]
+
         with self._lock:
             self.conn.executemany(
                 """
@@ -179,7 +195,18 @@ class AsfiRepository:
             )
             self.conn.commit()
 
-    def log_audit(self, timestamp: str, banco_id: int, cuenta_id: int | None, evento: str, detalle: str, tipo_cambio: str | None = None, modo_tipo_cambio: str | None = None, fuente_tipo_cambio: str | None = None, lote_id: str | None = None) -> None:
+    def log_audit(
+        self,
+        timestamp: str,
+        banco_id: int,
+        cuenta_id: str | None,
+        evento: str,
+        detalle: str,
+        tipo_cambio: str | None = None,
+        modo_tipo_cambio: str | None = None,
+        fuente_tipo_cambio: str | None = None,
+        lote_id: str | None = None,
+    ) -> None:
         self.log_audit_batch(
             [
                 AuditEvent(
@@ -199,6 +226,7 @@ class AsfiRepository:
     def log_audit_batch(self, events: Sequence[AuditEvent]) -> None:
         if not events:
             return
+
         rows = [
             (
                 item.timestamp,
@@ -213,6 +241,7 @@ class AsfiRepository:
             )
             for item in events
         ]
+
         with self._lock:
             self.conn.executemany(
                 """
@@ -231,7 +260,15 @@ class AsfiRepository:
                 INSERT INTO TipoCambioLog (Timestamp, Modo, TipoCambio, BaseRate, Drift, Slot, Source)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (quote.generated_at, quote.mode, str(quote.rate), str(quote.base_rate), str(quote.drift), quote.slot, quote.source),
+                (
+                    quote.generated_at,
+                    quote.mode,
+                    str(quote.rate),
+                    str(quote.base_rate),
+                    str(quote.drift),
+                    quote.slot,
+                    quote.source,
+                ),
             )
             self.conn.commit()
 
@@ -241,7 +278,18 @@ class AsfiRepository:
     def log_errors_batch(self, errors: Sequence[ProcessingError]) -> None:
         if not errors:
             return
-        rows = [(error.banco_id, error.cuenta_id, error.stage, error.error, error.lote_id) for error in errors]
+
+        rows = [
+            (
+                error.banco_id,
+                error.cuenta_id,
+                error.stage,
+                error.error,
+                error.lote_id,
+            )
+            for error in errors
+        ]
+
         with self._lock:
             self.conn.executemany(
                 """
@@ -258,6 +306,7 @@ class AsfiRepository:
     def save_callbacks_batch(self, callbacks: Sequence[CallbackResult]) -> None:
         if not callbacks:
             return
+
         rows = [
             (
                 callback.banco_id,
@@ -269,6 +318,7 @@ class AsfiRepository:
             )
             for callback in callbacks
         ]
+
         with self._lock:
             self.conn.executemany(
                 """
@@ -285,7 +335,17 @@ class AsfiRepository:
     def save_consistency_batch(self, results: Sequence[ConsistencyResult]) -> None:
         if not results:
             return
-        rows = [(result.banco_id, result.cuenta_id, 1 if result.is_consistent else 0, result.details) for result in results]
+
+        rows = [
+            (
+                result.banco_id,
+                result.cuenta_id,
+                1 if result.is_consistent else 0,
+                result.details,
+            )
+            for result in results
+        ]
+
         with self._lock:
             self.conn.executemany(
                 """
@@ -304,7 +364,7 @@ class AsfiRepository:
             )
             return [dict(row) for row in cur.fetchall()]
 
-    def fetch_account(self, cuenta_id: int, banco_id: int) -> dict[str, Any] | None:
+    def fetch_account(self, cuenta_id: str, banco_id: int) -> dict[str, Any] | None:
         with self._lock:
             cur = self.conn.execute(
                 "SELECT * FROM Cuentas WHERE CuentaId = ? AND BancoId = ?",
@@ -312,7 +372,7 @@ class AsfiRepository:
             )
             row = cur.fetchone()
             return dict(row) if row else None
-        
+
     def close(self) -> None:
         with self._lock:
             if getattr(self, "conn", None) is not None:

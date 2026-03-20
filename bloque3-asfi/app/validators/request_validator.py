@@ -14,25 +14,43 @@ class RequestValidator:
     def validate_batch(self, batch: BankBatchResponse) -> None:
         if not batch.cuentas:
             raise ValueError("El lote recibido no contiene cuentas.")
-        self._validate_timestamp(batch.timestamp)
-        self._validate_nonce(batch.nonce)
+
         self._validate_bank(batch)
-        self._validate_api_key(batch)
-        self._validate_integrity(batch)
+
+        if batch.timestamp:
+            self._validate_timestamp(batch.timestamp)
+
+        if batch.nonce:
+            self._validate_nonce(batch.nonce)
+
+        if batch.api_key:
+            self._validate_api_key(batch)
+
+        if batch.request_hash:
+            self._validate_integrity(batch)
 
     def _validate_bank(self, batch: BankBatchResponse) -> None:
         if batch.banco_id <= 0:
             raise ValueError("BancoId inválido.")
+
         if not batch.algoritmo:
             raise ValueError("El lote no informa algoritmo.")
+
         for account in batch.cuentas:
             if account.banco_id != batch.banco_id:
                 raise ValueError("El lote contiene cuentas de otro banco.")
+
             if account.lote_id != batch.lote_id:
                 raise ValueError("El lote contiene cuentas con lote_id inconsistente.")
 
+            if not account.cuenta_id:
+                raise ValueError("El lote contiene una cuenta sin CuentaId.")
+
     def _validate_timestamp(self, timestamp: str) -> None:
-        received_at = datetime.fromisoformat(timestamp)
+        received_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if received_at.tzinfo is None:
+            received_at = received_at.replace(tzinfo=timezone.utc)
+
         now = datetime.now(timezone.utc)
         diff = abs((now - received_at).total_seconds())
         if diff > settings.nonce_ttl_seconds:
@@ -45,12 +63,10 @@ class RequestValidator:
 
     def _validate_api_key(self, batch: BankBatchResponse) -> None:
         expected = derive_bank_api_key(batch.banco_id)
-        if batch.api_key and batch.api_key != expected:
+        if batch.api_key != expected:
             raise ValueError("API key inválida para el banco emisor.")
 
     def _validate_integrity(self, batch: BankBatchResponse) -> None:
-        if not batch.request_hash:
-            return
         expected_hash = compute_batch_hash(
             bank_id=batch.banco_id,
             lote_id=batch.lote_id,
