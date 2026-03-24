@@ -1,0 +1,51 @@
+{
+  "1": {
+    "seed": "ASFI-CESAR-2026",
+    "shift": 5
+  },
+  "2": {
+    "seed": "ASFI-ATBASH-2026"
+  },
+  "3": {
+    "seed": "ASFI-VIGENERE-2026"
+  },
+  "4": {
+    "seed": "ASFI-PLAYFAIR-2026"
+  },
+  "5": {
+    "seed": "ASFI-HILL-2026",
+    "matrix": [
+      3,
+      3,
+      2,
+      5
+    ]
+  },
+  "6": {
+    "seed": "ASFI-DES-2026"
+  },
+  "7": {
+    "seed": "ASFI-3DES-2026"
+  },
+  "8": {
+    "seed": "ASFI-BLOWFISH-2026"
+  },
+  "9": {
+    "seed": "ASFI-TWOFISH-2026"
+  },
+  "10": {
+    "seed": "ASFI-AES-2026"
+  },
+  "11": {
+    "seed": "ASFI-RSA-2026"
+  },
+  "12": {
+    "seed": "ASFI-ELGAMAL-2026"
+  },
+  "13": {
+    "seed": "ASFI-ECC-2026"
+  },
+  "14": {
+    "seed": "ASFI-CHACHA20-2026"
+  }
+}

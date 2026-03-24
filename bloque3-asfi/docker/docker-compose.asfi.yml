@@ -1,0 +1,28 @@
+services:
+  mysql-asfi:
+    image: mysql:8.4
+    container_name: mysql-asfi
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ASFI_Central
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_asfi_data:/var/lib/mysql
+
+  neo4j-asfi:
+    image: neo4j:5
+    container_name: neo4j-asfi
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/password123
+    ports:
+      - "7574:7574"
+      - "7787:7787"
+    volumes:
+      - neo4j_asfi_data:/data
+
+volumes:
+  mysql_asfi_data:
+  neo4j_asfi_data:
